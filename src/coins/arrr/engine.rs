@@ -32,7 +32,7 @@ pub const CONFIRMATIONS: isize = 4;
 pub const CONFIRMATIONS: isize = 1;
 
 #[cfg(test)]
-pub const SAPLING_HRP: &str = HRP_SAPLING_PAYMENT_ADDRESS;
+pub const SAPLING_HRP: &str = mainnet::HRP_SAPLING_PAYMENT_ADDRESS;
 
 // Needed as zcash_primitives provides mainnet (zcash_primitives::consensus::MainNetwork)
 // and testnet (zcash_primitives::consensus::TestNetwork) params, yet not PirateChain
@@ -60,7 +60,7 @@ impl Parameters for MainNetwork {
     mainnet::HRP_SAPLING_EXTENDED_FULL_VIEWING_KEY
   }
   fn hrp_sapling_payment_address(&self) -> &str {
-    HRP_SAPLING_PAYMENT_ADDRESS
+    mainnet::HRP_SAPLING_PAYMENT_ADDRESS
   }
   fn b58_pubkey_address_prefix(&self) -> [u8; 2] {
     mainnet::B58_PUBKEY_ADDRESS_PREFIX
