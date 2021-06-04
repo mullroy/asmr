@@ -35,9 +35,7 @@ pub const CONFIRMATIONS: isize = 1;
 pub const SAPLING_HRP: &str = HRP_SAPLING_PAYMENT_ADDRESS;
 
 // Needed as zcash_primitives provides mainnet (zcash_primitives::consensus::MainNetwork)
-// and testnet (zcash_primitives::consensus::TestNetwork) params, yet not regtest
-// Expected to be used with:
-// ./bin/zcashd --regtest -nuparams=5ba81b19:1 -nuparams=76b809bb:1 -nuparams=2bb40e60:1 -nuparams=f5b9230b:1 -nuparams=e9ff75a6:1
+// and testnet (zcash_primitives::consensus::TestNetwork) params, yet not PirateChain
 #[derive(Clone)]
 struct MainNetwork(());
 impl Parameters for MainNetwork {
