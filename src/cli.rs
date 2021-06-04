@@ -63,6 +63,8 @@ pub enum UnscriptedCoin {
   Monero,
   #[enumeration(alias = "zec")]
   ZCashShielded,
+  #[enumeration(alias = "arrr")]
+  PirateChain,
 }
 
 enum AnyCoin {

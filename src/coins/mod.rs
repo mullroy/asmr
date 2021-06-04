@@ -3,6 +3,7 @@ pub mod meros;
 pub mod nano;
 pub mod xmr;
 pub mod zec;
+pub mod arrr;
 
 use std::marker::PhantomData;
 
@@ -75,7 +76,8 @@ pub enum AnyUnscriptedClient {
   Meros(meros::client::MerosClient),
   Nano(nano::client::NanoClient),
   Monero(xmr::client::XmrClient),
-  ZCashShielded(zec::client::ZecShieldedClient)
+  ZCashShielded(zec::client::ZecShieldedClient),
+  PirateChain(arrr::client::ArrrClient)
 }
 
 #[async_trait]
@@ -128,5 +130,6 @@ pub enum AnyUnscriptedVerifier {
   Meros(meros::verifier::MerosVerifier),
   Nano(nano::verifier::NanoVerifier),
   Monero(xmr::verifier::XmrVerifier),
-  ZCashShielded(zec::verifier::ZecShieldedVerifier)
+  ZCashShielded(zec::verifier::ZecShieldedVerifier),
+  PirateChain(arrr::verifier::ArrrVerifier)
 }

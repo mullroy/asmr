@@ -15,3 +15,5 @@ mod btc_and_nano;
 mod btc_and_xmr;
 #[cfg(all(feature = "test_bitcoin_node", feature = "test_zcash_node"))]
 mod btc_and_zec;
+// #[cfg(all(feature = "test_bitcoin_node", feature = "test_arrr_node"))]
+// mod btc_and_arrr;
