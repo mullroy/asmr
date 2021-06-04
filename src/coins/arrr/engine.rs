@@ -156,7 +156,7 @@ impl ArrrEngine {
       sapling: SaplingResponse
     }
     let tree: TreeResponse = result.rpc_call("z_gettreestate", &json![[result.height_at_start.to_string()]]).await?;
-    result.tree = CommitmentTree::<Node>::read(&*hex::decode(tree.sapling.commitments.finalState).expect("ZCashd returned a non-hex tree"))?;
+    result.tree = CommitmentTree::<Node>::read(&*hex::decode(tree.sapling.commitments.finalState).expect("pirated returned a non-hex tree"))?;
 
     Ok(result)
   }
@@ -194,9 +194,9 @@ impl ArrrEngine {
     debug!("RPC call to {} with {:?} returned {}", method, params, &res);
 
     let parsed_res: FullResponse<Response> = serde_json::from_str(&res)
-      .map_err(|_| anyhow::anyhow!("ZCashd didn't respond with expected JSON"))?;
+      .map_err(|_| anyhow::anyhow!("pirated didn't respond with expected JSON"))?;
     match parsed_res {
-      FullResponse::Err { error } => anyhow::bail!("ZCashd RPC returned an error: {}", error),
+      FullResponse::Err { error } => anyhow::bail!("pirated RPC returned an error: {}", error),
       FullResponse::Ok { result } => Ok(result),
     }
   }
@@ -254,8 +254,8 @@ impl ArrrEngine {
       tx_hash_hex, 0, block_hash_hex
     ])).await?;
     let tx = Transaction::read(
-      &*hex::decode(&res).expect("ZCashd returned a non-hex block")
-    ).expect("ZCashd returned an invalid Transaction");
+      &*hex::decode(&res).expect("pirated returned a non-hex block")
+    ).expect("pirated returned an invalid Transaction");
     Ok(tx)
   }
 
