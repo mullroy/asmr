@@ -249,9 +249,9 @@ impl ArrrEngine {
     info.blocks
   }
 
-  async fn get_transaction(&self, tx_hash_hex: &str, block_hash_hex: &str) -> anyhow::Result<Transaction> {
+  async fn get_transaction(&self, tx_hash_hex: &str) -> anyhow::Result<Transaction> {
     let res: String = self.rpc_call("getrawtransaction", &json!([
-      tx_hash_hex, 0, block_hash_hex
+      tx_hash_hex, 0
     ])).await?;
     let tx = Transaction::read(
       &*hex::decode(&res).expect("pirated returned a non-hex block")
@@ -270,12 +270,12 @@ impl ArrrEngine {
 
     let mut result = vec![];
     for tx in res.tx {
-      result.push(self.get_transaction(&tx, &res.hash).await?);
+      result.push(self.get_transaction(&tx).await?);
     }
     Ok((result, res.hash))
   }
 
-  async fn get_confirmations(&self, tx_hash_hex: &str, block_hash_hex: &str) -> anyhow::Result<isize> {
+  async fn get_confirmations(&self, tx_hash_hex: &str) -> anyhow::Result<isize> {
     #[derive(Deserialize, Debug)]
     struct ConfirmationResponse {
       in_active_chain: bool,
@@ -283,7 +283,7 @@ impl ArrrEngine {
     }
 
     let res: ConfirmationResponse = self.rpc_call("getrawtransaction", &json!([
-      tx_hash_hex, 1, block_hash_hex
+      tx_hash_hex, 1
     ])).await?;
     if !res.in_active_chain {
       anyhow::bail!("Transaction was reorganized off the chain");
@@ -293,7 +293,7 @@ impl ArrrEngine {
 
   pub async fn get_deposit(&mut self, vk: &ViewingKey, wait: bool) -> anyhow::Result<Option<u64>> {
     let mut block = self.height_at_start - 1;
-    let mut block_hash = "".to_string();
+    // let mut block_hash = "".to_string();
     let mut tx_hash = "".to_string();
     let mut funds;
     'outer: loop {
@@ -326,7 +326,7 @@ impl ArrrEngine {
                 self.branch = Some(BranchId::for_height(&MainNetwork(()), BlockHeight::from_u32(block as u32)));
                 // The TXID is stored in little endian, forcing this
                 tx_hash = hex::encode(&tx.txid().0.to_vec().into_iter().rev().map(|x| x.to_owned()).collect::<Vec<u8>>());
-                block_hash = txs.1.clone();
+                // block_hash = txs.1.clone();
               }
             }
           }
@@ -345,7 +345,7 @@ impl ArrrEngine {
       tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
     }
 
-    while self.get_confirmations(&tx_hash, &block_hash).await? < CONFIRMATIONS {
+    while self.get_confirmations(&tx_hash).await? < CONFIRMATIONS {
       if !wait {
         return Ok(None);
       }
