@@ -24,9 +24,9 @@ pub const CONFIRMATIONS: isize = 1;
 #[cfg(feature = "no_confs")]
 pub const CONFIRMATIONS: isize = -1;
 
-#[cfg(not(test))]
-pub const NETWORK: Network = Network::Testnet;
-#[cfg(test)]
+// #[cfg(not(test))]
+// pub const NETWORK: Network = Network::Testnet;
+// #[cfg(test)]
 pub const NETWORK: Network = Network::Regtest;
 
 lazy_static! {
