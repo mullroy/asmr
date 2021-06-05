@@ -278,16 +278,16 @@ impl ArrrEngine {
   async fn get_confirmations(&self, tx_hash_hex: &str) -> anyhow::Result<isize> {
     #[derive(Deserialize, Debug)]
     struct ConfirmationResponse {
-      in_active_chain: bool,
+      // in_active_chain: bool,
       confirmations: isize
     }
 
     let res: ConfirmationResponse = self.rpc_call("getrawtransaction", &json!([
       tx_hash_hex, 1
     ])).await?;
-    if !res.in_active_chain {
-      anyhow::bail!("Transaction was reorganized off the chain");
-    }
+    // if !res.in_active_chain {
+    //   anyhow::bail!("Transaction was reorganized off the chain");
+    // }
     Ok(res.confirmations)
   }
 
