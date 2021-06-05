@@ -27,7 +27,7 @@ use zcash_client_backend::encoding::{encode_payment_address, decode_payment_addr
 use crate::crypt_engines::{CryptEngine, jubjub_engine::JubjubEngine};
 
 #[cfg(not(feature = "no_confs"))]
-pub const CONFIRMATIONS: isize = 4;
+pub const CONFIRMATIONS: isize = 2;
 #[cfg(feature = "no_confs")]
 pub const CONFIRMATIONS: isize = 1;
 
@@ -279,7 +279,7 @@ impl ArrrEngine {
     #[derive(Deserialize, Debug)]
     struct ConfirmationResponse {
       // in_active_chain: bool,
-      confirmations: isize
+      rawconfirmations: isize
     }
 
     let res: ConfirmationResponse = self.rpc_call("getrawtransaction", &json!([
@@ -288,7 +288,7 @@ impl ArrrEngine {
     // if !res.in_active_chain {
     //   anyhow::bail!("Transaction was reorganized off the chain");
     // }
-    Ok(res.confirmations)
+    Ok(res.rawconfirmations)
   }
 
   pub async fn get_deposit(&mut self, vk: &ViewingKey, wait: bool) -> anyhow::Result<Option<u64>> {
