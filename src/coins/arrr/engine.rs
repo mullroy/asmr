@@ -246,7 +246,8 @@ impl ArrrEngine {
       blocks: isize
     }
     let info: InfoResponse = self.rpc_call("getinfo", &json!([])).await.expect("Couldn't get the network info");
-    info.blocks
+    // suggested by VecDeque for ARRR
+    info.blocks - 5
   }
 
   async fn get_transaction(&self, tx_hash_hex: &str) -> anyhow::Result<Transaction> {
