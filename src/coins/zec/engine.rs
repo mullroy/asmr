@@ -1,4 +1,7 @@
-use std::fmt::Debug;
+use std::{
+  convert::TryInto,
+  fmt::Debug
+};
 use log::debug;
 
 use rand::{RngCore, rngs::OsRng};
@@ -98,7 +101,7 @@ pub struct ZecEngine {
   pub ask: Option<<JubjubEngine as CryptEngine>::PrivateKey>,
   pub nsk: <JubjubEngine as CryptEngine>::PrivateKey,
   pub vk: Option<ViewingKey>,
-  diversifier: [u8; 11],
+  diversifier: Option<Diversifier>,
 
   height_at_start: isize,
   tree: CommitmentTree<Node>,
@@ -109,7 +112,10 @@ pub struct ZecEngine {
   // Unless that was also passed around, in which case we just have a secondary struct for effectively no reason
   witness: Option<IncrementalWitness<Node>>,
   note: Option<Note>,
-  branch: Option<BranchId>
+  branch: Option<BranchId>,
+
+  #[cfg(test)]
+  wallet_address: String
 }
 
 impl ZecEngine {
@@ -125,14 +131,17 @@ impl ZecEngine {
       ask: None,
       nsk: JubjubEngine::new_private_key(),
       vk: None,
-      diversifier: [0; 11],
+      diversifier: None,
 
       height_at_start: -1,
       tree: CommitmentTree::<Node>::empty(),
 
       witness: None,
       note: None,
-      branch: None
+      branch: None,
+
+      #[cfg(test)]
+      wallet_address: "".to_string()
     };
     result.height_at_start = result.get_height().await;
 
@@ -151,6 +160,11 @@ impl ZecEngine {
     }
     let tree: TreeResponse = result.rpc_call("z_gettreestate", &json![[result.height_at_start.to_string()]]).await?;
     result.tree = CommitmentTree::<Node>::read(&*hex::decode(tree.sapling.commitments.finalState).expect("ZCashd returned a non-hex tree"))?;
+
+    #[cfg(test)]
+    {
+      result.wallet_address = result.rpc_call("z_getnewaddress", &json!([])).await?;
+    }
 
     Ok(result)
   }
@@ -201,37 +215,46 @@ impl ZecEngine {
     nsk: &<JubjubEngine as CryptEngine>::PrivateKey
   ) {
     self.nsk = JubjubEngine::add_private_key(&self.nsk, nsk);
-    self.vk = Some(ViewingKey {
+    let vk = ViewingKey {
       ak: JubjubEngine::add_public_key(&JubjubEngine::to_public_key(
         &self.ask.as_ref().expect("Key exchange occurring before generating keys")),
         ak
       ),
       nk: JubjubEngine::mul_by_proof_generation_generator(&self.nsk)
-    });
-  }
+    };
 
-  pub fn get_deposit_address(&mut self) -> String {
     // Seemingly random, generated using common data so we don't need to send another mutual variable
     // Avoids the need for a more complicated method/a master secret
     // This should likely be improved to the algorithm described by the Sapling protocol documentation
-    self.diversifier.copy_from_slice(&sha2::Sha256::new()
+    let mut diversifier = [0; 11];
+    diversifier.copy_from_slice(&sha2::Sha256::new()
       // DST for extra safety. If for some reason H(self.nsk) must be kept secret, this ensures it
       // While we'd only leak 11 bytes, that's still a 88-bit reduction
       .chain("asmr diversifier")
       .chain(&JubjubEngine::private_key_to_bytes(&self.nsk))
       .finalize()[..11]
     );
-    self.vk.as_ref().expect("Getting deposit address before sharing keys").ivk().to_repr();
-    let mut address;
-    while {
-      address = self.vk.as_ref().expect("Getting deposit address before sharing keys").to_payment_address(Diversifier(self.diversifier));
-      address.is_none()
-    } {
-      let diversifier_copy = self.diversifier;
-      self.diversifier.copy_from_slice(&sha2::Sha256::digest(&diversifier_copy)[..11]);
+    // Recursively hash the diversifier until a valid one is found
+    // This is also somewhat mirrored by the protocol's definition of how to generate a diversifier
+    // That also has multiple failure values and takes the first which works
+    while vk.to_payment_address(Diversifier(diversifier)).is_none() {
+      let diversifier_copy = diversifier;
+      diversifier.copy_from_slice(&sha2::Sha256::digest(&diversifier_copy)[..11]);
     }
 
-    encode_payment_address(HRP_SAPLING_PAYMENT_ADDRESS, &address.unwrap())
+    self.vk = Some(vk);
+    self.diversifier = Some(Diversifier(diversifier));
+  }
+
+  pub fn get_deposit_address(&mut self) -> String {
+    encode_payment_address(
+      HRP_SAPLING_PAYMENT_ADDRESS,
+      &self
+        .vk.as_ref().expect("Getting deposit address before sharing keys")
+        // unwrap as it'd have the same expect message as above
+        .to_payment_address(self.diversifier.clone().unwrap())
+        .expect("Generated an invalid diversifier when sharing keys")
+    )
   }
 
   async fn get_height(&self) -> isize {
@@ -286,7 +309,7 @@ impl ZecEngine {
   }
 
   pub async fn get_deposit(&mut self, vk: &ViewingKey, wait: bool) -> anyhow::Result<Option<u64>> {
-    let mut block = self.height_at_start - 1;
+    let mut block = self.height_at_start + 1;
     let mut block_hash = "".to_string();
     let mut tx_hash = "".to_string();
     let mut funds;
@@ -324,6 +347,19 @@ impl ZecEngine {
               }
             }
           }
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct BlockResponse {
+          finalsaplingroot: String
+        }
+        let block_res: BlockResponse = self.rpc_call("getblock", &json!([block.to_string()])).await?;
+
+        if dbg!(Node::new(
+          hex::decode(block_res.finalsaplingroot).expect("Sapling root wasn't hex")
+            .into_iter().rev().collect::<Vec<u8>>()[..].try_into().expect("Sapling root wasn't 32 bytes")
+        )) != dbg!(self.tree.root()) {
+          anyhow::bail!("Block root doesn't match");
         }
 
         // Only break once we finish this entire block
@@ -374,7 +410,7 @@ impl ZecEngine {
     let mut builder = Builder::new(RegtestParams(()), BlockHeight::from_u32(self.get_height().await as u32));
     builder.add_sapling_spend(
       esk,
-      Diversifier(self.diversifier.clone()),
+      self.diversifier.clone().expect("Claiming despite never sharing keys"),
       self.note.clone().expect("Didn't set the note when funds were received"),
       self.witness.clone().expect("Didn't set the witness when funds were received").path().unwrap()
     )?;
@@ -395,7 +431,36 @@ impl ZecEngine {
 
   #[cfg(test)]
   pub async fn mine_block(&self) -> anyhow::Result<()> {
-    let _: Vec<String> = self.rpc_call("generate", &json!([10])).await?;
+    for _ in 0 .. 10 {
+      #[derive(Deserialize, Debug)]
+      struct ShieldResponse {
+        opid: String
+      }
+      let mut shield: anyhow::Result<ShieldResponse> = self.rpc_call("z_shieldcoinbase", &json!([
+        "*", &self.wallet_address
+      ])).await;
+
+      if shield.is_ok() {
+        #[derive(Deserialize, Debug)]
+        struct StatusResponse {
+          status: String
+        }
+        while {
+          let status: Vec<StatusResponse> = self.rpc_call("z_getoperationstatus", &json!([[shield.as_ref().unwrap().opid]])).await?;
+          if status[0].status == "failed" {
+            tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+            shield = self.rpc_call("z_shieldcoinbase", &json!([
+              "*", &self.wallet_address
+            ])).await;
+          }
+          status[0].status != "success"
+        } {
+          tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
+        }
+      }
+      let _: Vec<String> = self.rpc_call("generate", &json!([1])).await?;
+    }
+
     Ok(())
   }
 
@@ -405,30 +470,10 @@ impl ZecEngine {
       self.mine_block().await?;
     }
 
-    let address: String = self.rpc_call("z_getnewaddress", &json!([])).await?;
-
-    #[derive(Deserialize, Debug)]
-    struct ShieldResponse {
-      opid: String
-    }
-    let shield: ShieldResponse = self.rpc_call("z_shieldcoinbase", &json!([
-      "*", address
+    let our_address = self.get_deposit_address();
+    let send: String = self.rpc_call("z_sendmany", &json!([
+      &self.wallet_address, [{"address": our_address, "amount": 1}]
     ])).await?;
-
-    #[derive(Deserialize, Debug)]
-    struct StatusResponse {
-      status: String
-    }
-    while {
-      let status: Vec<StatusResponse> = self.rpc_call("z_getoperationstatus", &json!([[shield.opid]])).await?;
-      if status[0].status == "failed" {
-        anyhow::bail!("Coinbase shield failed");
-      }
-      status[0].status != "success"
-    } {
-      tokio::time::delay_for(std::time::Duration::from_secs(1)).await;
-    }
-    self.mine_block().await?;
 
     // This is needed for some reason
     // Given that we wait for the operation to succeed before mining blocks, and wait on that, I have no idea why
@@ -436,11 +481,10 @@ impl ZecEngine {
     // Therefore, this should be updated, yet for now, it works
     tokio::time::delay_for(std::time::Duration::from_secs(3)).await;
 
-    let our_address = self.get_deposit_address();
-    let send: String = self.rpc_call("z_sendmany", &json!([
-      address, [{"address": our_address, "amount": 1}]
-    ])).await?;
-
+    #[derive(Deserialize, Debug)]
+    struct StatusResponse {
+      status: String
+    }
     while {
       let status: Vec<StatusResponse> = self.rpc_call("z_getoperationstatus", &json!([[send]])).await?;
       if status[0].status == "failed" {
