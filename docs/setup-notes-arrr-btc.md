@@ -1,6 +1,6 @@
 
 
-### Install Bitcoin
+<!-- ### Install Bitcoin
 
 ```bash
 sudo add-apt-repository ppa:luke-jr/bitcoincore
@@ -25,7 +25,7 @@ rpcpassword=hy4cRk49BmOlkrLT
 txindex=1
 prune=0
 server=1
-```
+``` -->
 
 
 
@@ -42,7 +42,7 @@ source $HOME/.cargo/env
 
 
 
-### Install Electrs
+<!-- ### Install Electrs
 
 ```bash
 git clone https://github.com/romanz/electrs.git
@@ -68,7 +68,7 @@ txid_limit=0
 # It will give output like this
 satinder@asmr:~/electrs$ ./target/debug/electrs --network regtest
 Config { log: StdErrLog { verbosity: Error, quiet: false, show_level: true, timestamp: Off, modules: [], writer: "stderr", color_choice: Auto }, network_type: Regtest, db_path: "./db/regtest", daemon_dir: "/home/satinder/.bitcoin/regtest", blocks_dir: "/home/satinder/.bitcoin/regtest/blocks", daemon_rpc_addr: V4(127.0.0.1:18443), electrum_rpc_addr: V4(127.0.0.1:60401), monitoring_addr: V4(127.0.0.1:24224), jsonrpc_import: false, index_batch_size: 10, bulk_index_threads: 4, tx_cache_size: 10485760, txid_limit: 0, server_banner: "Welcome to electrs 0.8.10 (Electrum Rust Server)!", blocktxids_cache_size: 10485760 }
-```
+``` -->
 
 
 
@@ -76,47 +76,49 @@ Config { log: StdErrLog { verbosity: Error, quiet: false, show_level: true, time
 
 ```bash
 # Install Dependencies
-sudo apt-get install python3-pyqt5 libsecp256k1-0 python3-cryptography python3-pip
-pip3 install requests
+sudo apt-get install python3-setuptools python3-pip
 
 # Download and Run Electrum Wallet
 wget https://download.electrum.org/4.1.2/Electrum-4.1.2.tar.gz
-tar zxvf Electrum-4.1.2.tar.gz
-cd Electrum-4.1.2
-./run_electrum --regtest -s 0.0.0.0:60401:t
+python3 -m pip install --user Electrum-4.1.2.tar.gz
+./run_electrum --testnet
 ```
 
 It will prompt for the setup wizard for wallet.
 Just go with the standard wallet, and generate a seed.
 
-Mine is:
-`before famous verify learn sock audit drink artwork shaft inquiry palm else`
-
 Go to "Recieve" tab in Electrum client GUI, and generate a new address. Example mine is:
-`bcrt1qsd2e0wtz8f684085cwugsr7jxlnwmcjheaqzft`
+`tb1q0qdptk8n8u33eqacy64pje7f8f0a3f063tsw3e`
 
-After that using `bitcoin-cli` generate new blocks:
+Go to websites like the following to get some TESTNET BTC:
+- https://coinfaucet.eu/en/btc-testnet/
+
+<!-- After that using `bitcoin-cli` generate new blocks:
 ```bash
 bitcoin-cli generatetoaddress 110 bcrt1qsd2e0wtz8f684085cwugsr7jxlnwmcjheaqzft
 ```
 
 It will generate 110 new blocks, and give 50 rewards each to your address supplied in that command.
-These will be visible in Electrum transaction history.
+These will be visible in Electrum transaction history. -->
 
 Open another terminal window/tab and also generate this electrum client's own rpc username, password and port:
 
 ```bash
-./run_electrum --regtest getconfig rpcuser
+satinder@ubuntu:~$ ./run_electrum --testnet getconfig rpcpassword
+kSrMi2YenWN9vBFPnHORDw==
+satinder@ubuntu:~$ ./run_electrum --testnet getconfig rpcuser
 user
-./run_electrum --regtest getconfig rpcpassword
-aLZ5jdyVaBRvvbMn6Frsgg==
-./run_electrum --regtest setconfig rpcport 8899
+satinder@ubuntu:~$ ./run_electrum --testnet getconfig rpcport
+satinder@ubuntu:~$ ./run_electrum --testnet setconfig rpcport 8899
 true
+satinder@ubuntu:~$ ./run_electrum --testnet getconfig rpcport
+8899
+satinder@ubuntu:~$ 
 ```
 
 In this case, it is:
 - rpc username: user
-- rpc password: aLZ5jdyVaBRvvbMn6Frsgg==
+- rpc password: kSrMi2YenWN9vBFPnHORDw==
 - rpc port: 8899
 
 
@@ -167,9 +169,9 @@ cp -av config_example config
 # We can ignore btc_url configuration, for now, as per dev
 cat config/bitcoin.json
 {
-  "url": "http://user:aLZ5jdyVaBRvvbMn6Frsgg==@127.0.0.1:8899",
-  "destination": "bcrt1qnxwuvle07f0jeuhg3cc42jp8c4h7htwrpvgx9e",
-  "refund": "bcrt1qnxwuvle07f0jeuhg3cc42jp8c4h7htwrpvgx9e",
+  "url": "http://user:kSrMi2YenWN9vBFPnHORDw==@127.0.0.1:8899",
+  "destination": "tb1qu6g85w5kzedpngvcy79fjz7ngasr2lze4a4cv9",
+  "refund": "tb1qu6g85w5kzedpngvcy79fjz7ngasr2lze4a4cv9",
 
   "btc_url": "http://user:pass@127.0.0.1:18443"
 }
@@ -182,8 +184,8 @@ cat config/bitcoin.json
 cat config/piratechain.json
 {
   "url": "http://user3791441600:pass572c6265d90b01b81626cbb9572e19d125ba3ff08d4af478709dd9830363223130@127.0.0.1:45453",
-  "destination": "zs1yh8n7cnkgrw38fzfyt7h8kg7mdxjwd0aqjet3lv5t2ahyhm45gq4wq5hampg4h6e89j95hem973",
-  "refund": "zs1yh8n7cnkgrw38fzfyt7h8kg7mdxjwd0aqjet3lv5t2ahyhm45gq4wq5hampg4h6e89j95hem973"
+  "destination": "zs1q48ph859rd4jrtpmq2p2yhp6u8yvqlh2mqlff3xj7ce80guy9n7laj9j0qkw4v6at3ycxld2248",
+  "refund": "zs1q48ph859rd4jrtpmq2p2yhp6u8yvqlh2mqlff3xj7ce80guy9n7laj9j0qkw4v6at3ycxld2248"
 }
 ```
 
@@ -202,5 +204,93 @@ In another new tab, run the following command as client node:
 ./target/debug/asmr client 0.0.0.0:2931 btc-arrr
 ```
 
+## First atomic swap between tBTC and ARRR
+Following are the dertails of one of the first atomic swap done between tBTC and ARRR using [asmr](https://github.com/satindergrewal/asmr), which is originally developed by [Meros Cryptocurrency](https://meroscrypto.io) developers.
+
+**Test Date/Time/Zone:** 15 June, midnight, NZST
+
+### Final asmr atomic swap results
+```bash
+asmr Testnet Bitcoin (tBTC) Address: tb1qu6g85w5kzedpngvcy79fjz7ngasr2lze4a4cv9
+asmr Mainnet Pirate Chain (ARRR) Address: zs1q48ph859rd4jrtpmq2p2yhp6u8yvqlh2mqlff3xj7ce80guy9n7laj9j0qkw4v6at3ycxld2248
+
+# asmr in-swap tBTC Address and tx details
+tBTC Address provided by Host: tb1q08l6jhx9eqfx7kyndxqvzyfcc85exqhtxfznsw
+tBTC tx ID: 4cb773fdf30fbf7e594594ecd1189f0fbb46fc074f1f51ec989cd47d4b7a45fc
+Amount Sent: 1.2 + 0.002 (fee) mBTC
+
+# asmr in-swap ARRR Address and tx details
+ARRR Address provided by Client: zs1gfwpxyn6ezn4xsj08wqghe60gft6jc6vv0gmyzjxr9v69mn2pxydg9ydmp08ledzukqcq582zf3
+ARRR tx ID: ef4b2634b6a40f50fb9b72f8c6e69a1318369807aa9b499a954c2e5d18c9bbdf
+Amount Sent: 0.1 + 0.0001 (fee) ARRR
+```
+
+```json
+satinder@ubuntu:~$ pirate z_getoperationstatus '["opid-eb35918e-1a45-4eb1-b85c-3710ce669263"]'
+[
+  {
+    "id": "opid-eb35918e-1a45-4eb1-b85c-3710ce669263",
+    "status": "success",
+    "creation_time": 1623677010,
+    "result": {
+      "txid": "ef4b2634b6a40f50fb9b72f8c6e69a1318369807aa9b499a954c2e5d18c9bbdf"
+    },
+    "execution_secs": 3.145586364,
+    "method": "z_sendmany",
+    "params": {
+      "fromaddress": "zs1dqlvgkla8wtlqyj45cdns0ttruh0gj6njn6glnn9efl9ruhhmem5y7jzarzsdruu2frnqfcdfvt",
+      "amounts": [
+        {
+          "address": "zs1gfwpxyn6ezn4xsj08wqghe60gft6jc6vv0gmyzjxr9v69mn2pxydg9ydmp08ledzukqcq582zf3",
+          "amount": 0.1
+        }
+      ],
+      "minconf": 1,
+      "fee": 0.0001
+    }
+  }
+]
+```
 
 
+#### Recieved tBTC:
+- tBTC Address: tb1qu6g85w5kzedpngvcy79fjz7ngasr2lze4a4cv9
+- tBTC tx ID: b3b601cc7008a6a649e99f9febb3e9029714b5c8c07d2103e91e1d71cdce4461
+- tBTC Amount: 1.024 tBTC
+
+
+#### Recieved ARRR:
+- ARRR Address: zs1q48ph859rd4jrtpmq2p2yhp6u8yvqlh2mqlff3xj7ce80guy9n7laj9j0qkw4v6at3ycxld2248
+- ARRR tx ID: 0f7baca17791d2d8fa7850a56dcb9c29ba6f42158895ba94d0ef08389275e039
+- ARRR Amount: 0.09990000
+
+```json
+satinder@ubuntu:~$ pirate z_listunspent 0 9999999 false '["zs1q48ph859rd4jrtpmq2p2yhp6u8yvqlh2mqlff3xj7ce80guy9n7laj9j0qkw4v6at3ycxld2248"]'
+[
+  {
+    "txid": "0f7baca17791d2d8fa7850a56dcb9c29ba6f42158895ba94d0ef08389275e039",
+    "outindex": 1,
+    "confirmations": 31,
+    "rawconfirmations": 31,
+    "spendable": true,
+    "address": "zs1q48ph859rd4jrtpmq2p2yhp6u8yvqlh2mqlff3xj7ce80guy9n7laj9j0qkw4v6at3ycxld2248",
+    "amount": 0.09990000,
+    "memo": "f600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "change": false
+  }
+]
+satinder@ubuntu:~$ 
+```
+
+#### YouTube recording of this tBTC and ARRR atomic swap session
+If you are patient enough, here's the video recording of this whole session on my YouTube channel:
+https://youtu.be/HcVXvv1ybTI
+
+#### Full (almost) log of both asmr host and client terminals
+Here's the full terminal log of both host and client asmr console with Rust Debugging enabled.
+I later found that my terminal had cut off the long logs due to some default limits of cutting old standard outputs from console session.
+But anyway, there's some log if anyone wants to look at, or can have a look at the video above which can fill the missing gaps from the text log details.
+
+asmr host console log: https://pastebin.ubuntu.com/p/6SM2S5chk2/
+
+asmr client console log: https://pastebin.ubuntu.com/p/7jKKbZCfKg/
