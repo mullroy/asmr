@@ -30,6 +30,7 @@ use crate::{
     xmr::{client::XmrClient, verifier::XmrVerifier},
     zec::{client::ZecShieldedClient, verifier::ZecShieldedVerifier},
     arrr::{client::ArrrClient, verifier::ArrrVerifier}
+    vrsc::{client::VerusClient, verifier::VerusVerifier}
   },
   cli::{ScriptedCoin, UnscriptedCoin, Cli}
 };
@@ -60,6 +61,7 @@ async fn main() {
       UnscriptedCoin::Monero => XmrVerifier::new(&unscripted_config).await.map(Into::into),
       UnscriptedCoin::ZCashShielded => ZecShieldedVerifier::new(&unscripted_config).await.map(Into::into),
       UnscriptedCoin::PirateChain => ArrrVerifier::new(&unscripted_config).await.map(Into::into)
+      UnscriptedCoin::VerusCoin => VerusVerifier::new(&unscripted_config).await.map(Into::into)
     }.expect("Failed to create unscripted verifier");
 
     // Have the host also host the server socket
@@ -110,6 +112,7 @@ async fn main() {
       UnscriptedCoin::Monero => XmrClient::new(&unscripted_config).await.map(Into::into),
       UnscriptedCoin::ZCashShielded => ZecShieldedClient::new(&unscripted_config).await.map(Into::into),
       UnscriptedCoin::PirateChain => ArrrClient::new(&unscripted_config).await.map(Into::into),
+      UnscriptedCoin::VerusCoin => VerusClient::new(&unscripted_config).await.map(Into::into),
     }.expect("Failed to create unscripted client");
     let mut scripted_verifier: AnyScriptedVerifier = match opts.pair.scripted {
       ScriptedCoin::Bitcoin => BtcVerifier::new(&scripted_config).map(Into::into),
