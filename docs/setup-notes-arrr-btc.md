@@ -205,7 +205,7 @@ In another new tab, run the following command as client node:
 ```
 
 ## First atomic swap between tBTC and ARRR
-Following are the dertails of one of the first atomic swap done between tBTC and ARRR using [asmr](https://github.com/satindergrewal/asmr), which is originally developed by [Meros Cryptocurrency](https://meroscrypto.io) developers.
+Following are the details of one of the first atomic swap done between tBTC and ARRR using [asmr](https://github.com/satindergrewal/asmr), which is originally developed by [Meros Cryptocurrency](https://meroscrypto.io) developers.
 
 **Test Date/Time/Zone:** 15 June, midnight, NZST
 
