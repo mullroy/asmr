@@ -29,7 +29,7 @@ use crate::{
     nano::{client::NanoClient, verifier::NanoVerifier},
     xmr::{client::XmrClient, verifier::XmrVerifier},
     zec::{client::ZecShieldedClient, verifier::ZecShieldedVerifier},
-    arrr::{client::ArrrClient, verifier::ArrrVerifier}
+    arrr::{client::ArrrClient, verifier::ArrrVerifier},
     vrsc::{client::VerusClient, verifier::VerusVerifier}
   },
   cli::{ScriptedCoin, UnscriptedCoin, Cli}
@@ -60,7 +60,7 @@ async fn main() {
       UnscriptedCoin::Nano => NanoVerifier::new(&unscripted_config).map(Into::into),
       UnscriptedCoin::Monero => XmrVerifier::new(&unscripted_config).await.map(Into::into),
       UnscriptedCoin::ZCashShielded => ZecShieldedVerifier::new(&unscripted_config).await.map(Into::into),
-      UnscriptedCoin::PirateChain => ArrrVerifier::new(&unscripted_config).await.map(Into::into)
+      UnscriptedCoin::PirateChain => ArrrVerifier::new(&unscripted_config).await.map(Into::into),
       UnscriptedCoin::VerusCoin => VerusVerifier::new(&unscripted_config).await.map(Into::into)
     }.expect("Failed to create unscripted verifier");
 

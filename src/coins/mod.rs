@@ -78,7 +78,7 @@ pub enum AnyUnscriptedClient {
   Nano(nano::client::NanoClient),
   Monero(xmr::client::XmrClient),
   ZCashShielded(zec::client::ZecShieldedClient),
-  PirateChain(arrr::client::ArrrClient)
+  PirateChain(arrr::client::ArrrClient),
   VerusCoin(vrsc::client::VerusClient)
 }
 
@@ -133,6 +133,6 @@ pub enum AnyUnscriptedVerifier {
   Nano(nano::verifier::NanoVerifier),
   Monero(xmr::verifier::XmrVerifier),
   ZCashShielded(zec::verifier::ZecShieldedVerifier),
-  PirateChain(arrr::verifier::ArrrVerifier)
+  PirateChain(arrr::verifier::ArrrVerifier),
   VerusCoin(vrsc::verifier::VerusVerifier)
 }
