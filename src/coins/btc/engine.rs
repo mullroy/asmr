@@ -27,7 +27,8 @@ pub const CONFIRMATIONS: isize = -1;
 // #[cfg(not(test))]
 // pub const NETWORK: Network = Network::Testnet;
 // #[cfg(test)]
-pub const NETWORK: Network = Network::Regtest;
+// pub const NETWORK: Network = Network::Regtest;
+pub const NETWORK: Network = Network::Testnet;
 
 lazy_static! {
   pub static ref SECP: Secp256k1<secp256k1::All> = Secp256k1::new();
