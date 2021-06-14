@@ -305,3 +305,6 @@ But anyway, there's some log if anyone wants to look at, or can have a look at t
 asmr host console log: https://pastebin.ubuntu.com/p/6SM2S5chk2/
 
 asmr client console log: https://pastebin.ubuntu.com/p/7jKKbZCfKg/
+
+
+**Special thanks to @VecDequer for all the help he gave to make it work.**
