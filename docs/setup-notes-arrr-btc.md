@@ -213,12 +213,19 @@ Following are the dertails of one of the first atomic swap done between tBTC and
 ```bash
 asmr Testnet Bitcoin (tBTC) Address: tb1qu6g85w5kzedpngvcy79fjz7ngasr2lze4a4cv9
 asmr Mainnet Pirate Chain (ARRR) Address: zs1q48ph859rd4jrtpmq2p2yhp6u8yvqlh2mqlff3xj7ce80guy9n7laj9j0qkw4v6at3ycxld2248
+```
 
+```bash
 # asmr in-swap tBTC Address and tx details
 tBTC Address provided by Host: tb1q08l6jhx9eqfx7kyndxqvzyfcc85exqhtxfznsw
 tBTC tx ID: 4cb773fdf30fbf7e594594ecd1189f0fbb46fc074f1f51ec989cd47d4b7a45fc
 Amount Sent: 1.2 + 0.002 (fee) mBTC
+```
+Sent tBTC transaction detail screenshot from Electrum Client:
+![Sent_tBTC_small_img](https://user-images.githubusercontent.com/12998093/121906982-bcfa6800-cd7f-11eb-8c60-556c49ba9c4b.png)
 
+
+```bash
 # asmr in-swap ARRR Address and tx details
 ARRR Address provided by Client: zs1gfwpxyn6ezn4xsj08wqghe60gft6jc6vv0gmyzjxr9v69mn2pxydg9ydmp08ledzukqcq582zf3
 ARRR tx ID: ef4b2634b6a40f50fb9b72f8c6e69a1318369807aa9b499a954c2e5d18c9bbdf
@@ -257,6 +264,10 @@ satinder@ubuntu:~$ pirate z_getoperationstatus '["opid-eb35918e-1a45-4eb1-b85c-3
 - tBTC Address: tb1qu6g85w5kzedpngvcy79fjz7ngasr2lze4a4cv9
 - tBTC tx ID: b3b601cc7008a6a649e99f9febb3e9029714b5c8c07d2103e91e1d71cdce4461
 - tBTC Amount: 1.024 tBTC
+
+Recieved tBTC transaction detail screenshot from Electrum Client:
+![recieved_tBTC_small_img](https://user-images.githubusercontent.com/12998093/121907156-e87d5280-cd7f-11eb-8bc5-97f6aa699020.png)
+
 
 
 #### Recieved ARRR:
