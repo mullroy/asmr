@@ -1,4 +1,7 @@
-use std::fmt::Debug;
+use std::{
+  convert::TryInto,
+  fmt::Debug
+};
 use log::debug;
 
 use rand::{RngCore, rngs::OsRng};
@@ -293,7 +296,7 @@ impl ArrrEngine {
   }
 
   pub async fn get_deposit(&mut self, vk: &ViewingKey, wait: bool) -> anyhow::Result<Option<u64>> {
-    let mut block = self.height_at_start - 1;
+    let mut block = self.height_at_start + 1;
     // let mut block_hash = "".to_string();
     let mut tx_hash = "".to_string();
     let mut funds;
@@ -331,6 +334,19 @@ impl ArrrEngine {
               }
             }
           }
+        }
+
+        #[derive(Deserialize, Debug)]
+        struct BlockResponse {
+          finalsaplingroot: String
+        }
+        let block_res: BlockResponse = self.rpc_call("getblock", &json!([block.to_string()])).await?;
+
+        if Node::new(
+          hex::decode(block_res.finalsaplingroot).expect("Sapling root wasn't hex")
+            .into_iter().rev().collect::<Vec<u8>>()[..].try_into().expect("Sapling root wasn't 32 bytes")
+        ) != self.tree.root() {
+          anyhow::bail!("Block root doesn't match");
         }
 
         // Only break once we finish this entire block
