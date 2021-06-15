@@ -113,7 +113,7 @@ cat config/bitcoin.json
 # Edit config/veruscoin.json
 # Use the address with funds in destination field
 # For refund address use the second generated shielded address
-# For RPC, use rpc info from ~/.komodo/PIRATE/PIRATE.conf
+# For RPC, use rpc info from ~/.komodo/VRSC/VRSC.conf
 # So, my config/veruscoin.json looks like this:
 cat config/veruscoin.json
 {
