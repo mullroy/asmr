@@ -158,6 +158,7 @@ Amount Sent: 1.643 + 0.002 tBTC
 Testnet BTC blockchain explorer link: https://www.blockchain.com/btc-testnet/tx/da16a1b2fa92c57af7c42ba2fac1bc33948f74c67c7779ec2e676b2977c8c0c0
 
 Sent Testnet BTC transaction detail screenshot from Electrum Client:
+![sent_testnet_BTC_small_img](https://user-images.githubusercontent.com/12998093/122046500-1a032600-ce33-11eb-9ec6-b510e125a511.png)
 
 
 #### asmr in-swap Mainnet VRSC Address and tx details
@@ -208,6 +209,7 @@ Recieved Testnet BTC Amount:  1.467 tBTC
 Testnet BTC blockchain explorer link: https://www.blockchain.com/btc-testnet/tx/5e2a6311028aa664fc49df26a49e049d7e55fb5d608d2c82e7cfb970a11d9069
 
 Recieved Testnet BTC transaction detail screenshot from Electrum Client:
+![recieved_testnet_BTC_small_img](https://user-images.githubusercontent.com/12998093/122046514-1ec7da00-ce33-11eb-969f-cc550cb6b750.png)
 
 
 
