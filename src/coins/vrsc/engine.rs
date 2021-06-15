@@ -283,7 +283,7 @@ impl VerusEngine {
     #[derive(Deserialize, Debug)]
     struct ConfirmationResponse {
       // in_active_chain: bool,
-      rawconfirmations: isize
+      confirmations: isize
     }
 
     let res: ConfirmationResponse = self.rpc_call("getrawtransaction", &json!([
@@ -292,7 +292,7 @@ impl VerusEngine {
     // if !res.in_active_chain {
     //   anyhow::bail!("Transaction was reorganized off the chain");
     // }
-    Ok(res.rawconfirmations)
+    Ok(res.confirmations)
   }
 
   pub async fn get_deposit(&mut self, vk: &ViewingKey, wait: bool) -> anyhow::Result<Option<u64>> {
