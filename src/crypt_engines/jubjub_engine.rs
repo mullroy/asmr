@@ -286,8 +286,8 @@ impl CryptEngine for JubjubEngine {
   fn encrypted_signature_to_bytes(_sig: &Self::EncryptedSignature) -> Vec<u8> {
     panic!("JubJub isn't used with signatures; there shouldn't be anything to serialize");
   }
-
-  fn encrypted_sign(
+ 
+  fn encrypted_sign(&mut self,
     _signing_key: &Self::PrivateKey,
     _encryption_key: &Self::PublicKey,
     _message: &[u8]

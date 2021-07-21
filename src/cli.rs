@@ -56,13 +56,6 @@ pub enum ScriptedCoin {
 #[derive(FromStr, Debug, Clone)]
 #[enumeration(rename_all = "lowercase")]
 pub enum UnscriptedCoin {
-  #[enumeration(alias = "mr")]
-  Meros,
-  Nano,
-  #[enumeration(alias = "xmr")]
-  Monero,
-  #[enumeration(alias = "zec")]
-  ZCashShielded,
   #[enumeration(alias = "arrr")]
   PirateChain,
 }

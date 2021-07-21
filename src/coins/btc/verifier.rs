@@ -1,13 +1,12 @@
 use std::{
   marker::PhantomData,
-  io::Write,
   convert::{TryInto, TryFrom},
   path::Path,
   fs::File
 };
 
 use async_trait::async_trait;
-
+use crc16::*;
 use sha2::Digest;
 
 use bitcoin::{
@@ -39,8 +38,8 @@ pub struct BtcVerifier {
 
   swap_hash: Option<Vec<u8>>,
 
-  decryption_key: Option<<Secp256k1Engine as CryptEngine>::PrivateKey>,
-  encryption_key: Option<<Secp256k1Engine as CryptEngine>::PublicKey>,
+  pub decryption_key: Option<<Secp256k1Engine as CryptEngine>::PrivateKey>,          //Make pub to initialise direclty from client Implementing a wrapper function is probably better
+  pub encryption_key: Option<<Secp256k1Engine as CryptEngine>::PublicKey>,           //Make pub to initialise direclty from client. Implementing a wrapper function is probably better
   encrypted_spend_sig: Option<<Secp256k1Engine as CryptEngine>::EncryptedSignature>,
 
   lock_id: Option<Txid>,
@@ -53,7 +52,7 @@ pub struct BtcVerifier {
 }
 
 impl BtcVerifier {
-  pub fn new(config_path: &Path) -> anyhow::Result<BtcVerifier> {
+  pub fn new(config_path: &String) -> anyhow::Result<BtcVerifier> {
     let config = serde_json::from_reader(File::open(config_path)?)?;
 
     Ok(BtcVerifier {
@@ -116,10 +115,58 @@ impl ScriptedVerifier for BtcVerifier {
     self.destination_script.to_bytes()
   }
 
-  fn generate_keys_for_engine<OtherCrypt: CryptEngine>(&mut self, _: PhantomData<&OtherCrypt>) -> (Vec<u8>, OtherCrypt::PrivateKey) {
+  //This function used when restoring the object variables from a stored session
+  fn restore_private_variables(&mut self, str_hex_decryption_key: &String, str_hex_btc_engine_b: &String, str_hex_btc_engine_br: &String )
+  {
+    //From scripted (BTC), to reach the unscripted engine (Arrr), we need a bridge function here:
+    if str_hex_decryption_key.len() == 0 ||
+       str_hex_btc_engine_b.len() == 0   ||
+       str_hex_btc_engine_br.len() == 0
+    {
+      //println!("btc/verifiers.rs restore_private_variables() The input is empty");
+      return;
+    }
+
+    //println!("restore_private_variables\n  str_hex_decryption_key {}\n  str_hex_btc_engine_b {}\n  str_hex_btc_engine_br {}", str_hex_decryption_key, str_hex_btc_engine_b, str_hex_btc_engine_br);
+    //Restore decryption_key
+    let ca_vec = hex::decode(str_hex_decryption_key).unwrap();
+    let ca_bytes:&[u8] = &ca_vec;
+    let mut ca32_bytes : [u8;32] = Default::default();
+    ca32_bytes.copy_from_slice(&ca_bytes[0..32]);      
+    self.decryption_key =  Some(Secp256k1Engine::bytes_to_private_key(ca32_bytes).unwrap());
+    let ca_decrypt_key_crc = State::<ARC>::calculate( &ca32_bytes[..]);
+    
+    //BTC engine: b
+    let ca_vec = hex::decode(str_hex_btc_engine_b).unwrap();
+    let ca_bytes:&[u8] = &ca_vec;
+    let mut ca32_bytes : [u8;32] = Default::default();
+    ca32_bytes.copy_from_slice(&ca_bytes[0..32]);      
+    self.engine.b =  Secp256k1Engine::bytes_to_private_key(ca32_bytes).unwrap();
+    //let ca_btc_engine_b_crc = State::<ARC>::calculate( &ca32_bytes[..]);
+    
+    //BTC engine: br    
+    let ca_vec = hex::decode(str_hex_btc_engine_br).unwrap();
+    let ca_bytes:&[u8] = &ca_vec;
+    let mut ca32_bytes : [u8;32] = Default::default();
+    ca32_bytes.copy_from_slice(&ca_bytes[0..32]);      
+    self.engine.br =  Secp256k1Engine::bytes_to_private_key(ca32_bytes).unwrap();
+    //let ca_btc_engine_br_crc = State::<ARC>::calculate( &ca32_bytes[..]);    
+    
+    //println!("restore_private_variables():\n  decryption_key crc={:02x?}", ca_decrypt_key_crc );
+  }  
+  
+  fn generate_keys_for_engine<OtherCrypt: CryptEngine>(&mut self, _: PhantomData<&OtherCrypt>) -> (Vec<u8>, OtherCrypt::PrivateKey, [u8;32]) {
+    //println!("btc/verifier.rs generate_keys_for_engine()");
     let (proof, key1, key2) = DlEqProof::<Secp256k1Engine, OtherCrypt>::new();
-    self.decryption_key = Some(key1);
-    (proof.serialize(), key2)
+    self.decryption_key = Some(key1.clone() );
+    
+    let ca_decrypt_key =  Secp256k1Engine::private_key_to_bytes(&self.decryption_key.as_ref().unwrap() );
+    let ca_decrypt_key_crc = State::<ARC>::calculate( &ca_decrypt_key[..]);
+    let ca_key2        =  OtherCrypt::private_key_to_bytes( &key2 );
+    let proof_crc = State::<ARC>::calculate( &proof.serialize()[..]);
+    //println!("  proof len={}, crc={:02x?}\n  decryption_key crc={:02x?}\n  encryption_key(key2)={:02x?}", proof.serialize().len(), proof_crc, ca_decrypt_key_crc, ca_key2);
+    
+    (proof.serialize(), key2, ca_decrypt_key)
   }
 
   fn verify_keys_for_engine<OtherCrypt: CryptEngine>(&mut self, keys: &[u8], _: PhantomData<&OtherCrypt>) -> anyhow::Result<OtherCrypt::PublicKey> {
@@ -140,11 +187,22 @@ impl ScriptedVerifier for BtcVerifier {
   fn BR(&self) -> Vec<u8> {
     Secp256k1Engine::public_key_to_bytes(&Secp256k1Engine::to_public_key(&self.engine.br))
   }
+  
+  fn Bpr(&self) -> [u8;32] {
+    Secp256k1Engine::private_key_to_bytes(&self.engine.b)
+  }
+
+  fn BRpr(&self) -> [u8;32] {
+    Secp256k1Engine::private_key_to_bytes(&self.engine.br)
+  }
 
   async fn complete_refund_and_prepare_spend(
     &mut self,
-    lock_and_host_signed_refund: &[u8]
+    lock_and_host_signed_refund: &[u8],    
+    pca_encrypted_sign_r1 : &[u8;32],                    //Random data / swap. Generate with r = Scalar::random(&mut OsRng);
+    pca_encrypted_sign_r2 : &[u8;32]                     //Random data / swap. Generate with r = Scalar::random(&mut OsRng);
   ) -> anyhow::Result<Vec<u8>> {
+    //println!("btc/verifiers.rs complete_refund_and_prepare_spend()");
     let host_refund = self.host_refund.as_ref().expect("Completing refund before verifying keys");
     let lock_and_refund: LockAndRefundInfo = bincode::deserialize(lock_and_host_signed_refund)?;
 
@@ -160,7 +218,7 @@ impl ScriptedVerifier for BtcVerifier {
       self.host.as_ref().expect("Completing refund before verifying keys"),
       host_refund
     );
-    self.swap_hash = Some(lock_and_refund.swap_hash);
+    self.swap_hash = Some(lock_and_refund.swap_hash);    
 
     let lock_id = deserialize(&lock_and_refund.lock_id)?;
     let (refund_script, mut refund, refund_msg, refund_sig) = self.engine.prepare_and_sign_refund(
@@ -174,6 +232,19 @@ impl ScriptedVerifier for BtcVerifier {
     self.lock_id = Some(lock_id);
     self.lock_value = Some(lock_and_refund.value);
     self.refund_script = Some(refund_script);
+    
+    let swap_hash_crc     = State::<ARC>::calculate( &self.swap_hash.clone().unwrap()[..]);      
+    let lock_id_crc       = State::<ARC>::calculate( &self.lock_id .clone().unwrap()[..]);         
+    let refund_script_crc = State::<ARC>::calculate( &self.refund_script.clone().unwrap()[..]);                          
+
+    let ca_bytes   = serialize( &refund.clone() ); //bitcoin::Transaction
+    let mut refund_crc = State::<ARC>::calculate( &ca_bytes[..]); 
+    
+    let refund_msg_crc    = State::<ARC>::calculate( &refund_msg[..]); 
+    let refund_sig_crc    = State::<ARC>::calculate( &refund_sig[..]); 
+    
+    //println!("swap_hash_crc={:02x?},lock_id_crc={:02x?},lock_value={:02x?},refund_script_crc={:02x?}, refund_crc={:02x?} (#1), refund_msg_crc={:02x?}, refund_sig_crc={:02x?}",
+    //          swap_hash_crc,        lock_id_crc,        self.lock_value.clone().unwrap(), refund_script_crc, refund_crc, refund_msg_crc, refund_sig_crc);   
 
     SECP.verify(
       &refund_msg,
@@ -188,8 +259,16 @@ impl ScriptedVerifier for BtcVerifier {
       lock_and_refund.fee_per_byte
     )?;
     let components = SighashComponents::new(&spend);
+    
+   
+    let mut ca_bytes  = serialize( &spend.clone() );                  //bitcoin::Transaction
+    let spend_crc     = State::<ARC>::calculate( &ca_bytes[..]); 
+    //println!("spend crc={:02x?}",spend_crc);
 
-    let encrypted_spend_sig_typed = Secp256k1Engine::encrypted_sign(
+    let mut struct_secp256k1_engine = Secp256k1Engine { ca_encrypted_sign_r1 : *pca_encrypted_sign_r1, 
+                                                        ca_encrypted_sign_r2 : *pca_encrypted_sign_r2 };
+
+    let encrypted_spend_sig_typed = Secp256k1Engine::encrypted_sign(&mut struct_secp256k1_engine,
       &self.engine.br,
       self.encryption_key.as_ref().expect("Attempted to generate encrypted sign before verifying dleq proof"),
       &components.sighash_all(
@@ -197,10 +276,13 @@ impl ScriptedVerifier for BtcVerifier {
         &Script::from(self.engine.refund_script_bytes.clone().expect("Preparing spend before knowing refund script")),
         refund.output[0].value
       )
-    )?;
+    )?;    
     let encrypted_spend_sig = Secp256k1Engine::encrypted_signature_to_bytes(&encrypted_spend_sig_typed);
     self.encrypted_spend_sig = Some(encrypted_spend_sig_typed);
-
+    
+    let encrypted_spend_sig_crc = State::<ARC>::calculate( &encrypted_spend_sig.clone()[..]);
+    //println!("encrypted_spend_sig crc={:02x?}",encrypted_spend_sig_crc);
+    
     refund.input[0].witness = vec![
       Vec::new(),
       refund_sig.clone(),
@@ -210,7 +292,12 @@ impl ScriptedVerifier for BtcVerifier {
     ];
     refund.input[0].witness[1].push(1);
     refund.input[0].witness[2].push(1);
-    self.refund = Some(refund);
+    self.refund = Some( refund.clone() );
+    
+    ca_bytes = serialize( &refund.clone() );                  //bitcoin::Transaction
+    refund_crc     = State::<ARC>::calculate( &ca_bytes[..]); 
+    //println!("refund crc={:02x?} #2",refund_crc);
+    
 
     Ok(bincode::serialize(&ClientRefundAndSpendSignatures {
       refund_signature: refund_sig,
@@ -218,19 +305,20 @@ impl ScriptedVerifier for BtcVerifier {
     }).expect("Couldn't serialize the client's refund and spend signatures"))
   }
 
-  fn verify_prepared_buy(&mut self, buy_info: &[u8]) -> anyhow::Result<()> {
+  fn verify_prepared_buy(&mut self, buy_info: &[u8]) -> anyhow::Result<String> {
+    //println!("verify_prepared_buy()");
     let host_bytes = self.host.as_ref().expect("Verifying and waiting for lock before verifying their keys");
     let lock_id = self.lock_id.expect("Finishing our buy before knowing the lock's ID");
 
     let buy_info: BuyInfo = bincode::deserialize(buy_info)?;
     if !cfg!(test) {
       print!("You will receive {} satoshis. Continue (yes/no)? ", buy_info.value);
-      std::io::stdout().flush().expect("Failed to flush stdout");
-      let mut line = String::new();
-      std::io::stdin().read_line(&mut line).expect("Couldn't read from stdin");
-      if !line.to_lowercase().starts_with("y") {
-        anyhow::bail!("User didn't confirm BTC amount");
-      }
+      //std::io::stdout().flush().expect("Failed to flush stdout");
+      //let mut line = String::new();
+      //std::io::stdin().read_line(&mut line).expect("Couldn't read from stdin");
+      //if !line.to_lowercase().starts_with("y") {
+      //  anyhow::bail!("User didn't confirm BTC amount");
+      //}
     }
 
     let mut buy: Transaction = Transaction {
@@ -295,23 +383,48 @@ impl ScriptedVerifier for BtcVerifier {
     ];
     buy.input[0].witness[1].push(1);
     buy.input[0].witness[2].push(1);
-    self.buy = Some(buy);
+    self.buy = Some( buy.clone() );
 
-    Ok(())
+    let ca_vec = serialize( &buy.clone() );
+    let ca_bytes:&[u8] = &ca_vec;
+    let str_hex_buy = hex::encode(ca_bytes.clone() );
+    
+    let ca_buy_crc = State::<ARC>::calculate( &ca_bytes[..]);
+    //println!("Buy crc:{:02x?}",ca_buy_crc);
+    
+    Ok( str_hex_buy )
   }
 
   async fn verify_and_wait_for_lock(
-    &mut self
-  ) -> anyhow::Result<()> {
+    &mut self,
+    wait: bool    
+  ) -> anyhow::Result<isize> {    
+    //println!("btc/verifier.rs verify_and_wait_for_lock()");
+    
+    self.lock_height=Some(0);
+    
     let lock_address = Address::p2wsh(self.engine.lock_script(), NETWORK).to_string();
 
     let mut history = self.rpc.get_address_history(&lock_address).await;
+    
+    let mut i_counter = 0;
     while history.len() == 0 {
       history = self.rpc.get_address_history(&lock_address).await;
-      tokio::time::delay_for(std::time::Duration::from_secs(20)).await;
+      tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+      
+      //If wait==true, block until the lock is detected.
+      //If wait==false, poll for 20 seconds and return with lock_height==0
+      if !wait
+      {
+        i_counter+=1;
+        if (i_counter>=2) //20 seconds
+        {
+          break;
+        }
+      }
     }
     if history.len() != 1 {
-      anyhow::bail!("Lock and refund exist");
+      anyhow::bail!("Lock and refund doesn't exist");
     }
 
     // Verify the lock. Simply getting it by the script hash verifies the lock script is used
@@ -347,14 +460,20 @@ impl ScriptedVerifier for BtcVerifier {
       self.lock_height = Some(history[0].height);
     }
 
-    Ok(())
+    Ok( self.lock_height.unwrap() )
+  }
+
+  fn restore_lock_height (&mut self, i_height : isize) {
+    self.lock_height = Some(i_height);
   }
 
   async fn claim_refund_or_recover_key(mut self) -> anyhow::Result<Option<[u8; 32]>> {
     let lock_height = self.lock_height.expect("Trying to publish refund despite no lock on chain");
+    //println!("claim_refund_or_recover_key: height={}",lock_height.clone());
     while self.rpc.get_height().await < (lock_height + (T0 as isize)) {
       tokio::time::delay_for(std::time::Duration::from_secs(20)).await;
     }
+    //println!("claim_refund_or_recover_key: rpc height confirmed");
 
     let refund = self.refund.as_ref().expect("Trying to get the refund despite not having a refund transaction");
 
@@ -464,7 +583,7 @@ impl ScriptedVerifier for BtcVerifier {
     }
   }
 
-  async fn finish(&self, swap_secret: &[u8]) -> anyhow::Result<()> {
+  async fn finish(&self, swap_secret: &[u8] ) -> anyhow::Result<(Vec<u8>,Vec<u8>)> {
     // Verify the received swap secret
     if sha2::Sha256::digest(swap_secret).to_vec() != self.swap_hash.clone().expect("Trying to finish our buy before knowing the swap hash") {
       anyhow::bail!("Received an invalid swap secret");
@@ -472,13 +591,19 @@ impl ScriptedVerifier for BtcVerifier {
     // Check that we aren't nearing the end of the timelock
     let lock_height = self.lock_height.expect("Attempted to finish swap before verifying lock confirmation");
     if self.rpc.get_height().await - lock_height >= SWAP_CUTOFF_BLOCKS {
-      anyhow::bail!("Attempted to finish swap, but we're nearing the end of the timelock");
+      //anyhow::bail!("Attempted to finish swap, but we're nearing the end of the timelock");
+      //println!("Attempted to finish swap, but we're nearing the end of the timelock. More than {} blocks have elapsed", SWAP_CUTOFF_BLOCKS);
     }
-
+    
     let mut buy = self.buy.clone().expect("Finishing before verifying buy");
     buy.input[0].witness[3] = swap_secret.to_vec();
-    self.rpc.publish(&serialize(&buy)).await?;
+    self.rpc.publish(&serialize(&buy.clone() )).await?;
+    
+    let ca_buy = serialize(&buy.clone() );
+    let ca_buy_txid = buy.txid();
+    
+//    //println!("txid: {}",buy.txid() );
 
-    Ok(())
+    Ok( (ca_buy,ca_buy_txid.to_vec() ) )
   }
 }

@@ -1,5 +1,5 @@
 use std::convert::TryInto;
-
+use crc16::*;
 use lazy_static::lazy_static;
 use hex_literal::hex;
 
@@ -77,15 +77,15 @@ pub struct BtcEngine {
 impl BtcEngine {
   pub fn new() -> BtcEngine {
     BtcEngine {
-      b: Secp256k1Engine::new_private_key(),
-      br: Secp256k1Engine::new_private_key(),
+      b: Secp256k1Engine::new_private_key(),       //<<Changes at every startup
+      br: Secp256k1Engine::new_private_key(),      //<<Changes at every startup
       bs: None,
 
       lock_script_bytes: None,
       lock_script: None,
 
       refund_script_bytes: None
-    }
+    }    
   }
 
   pub fn decode_address(address: &str) -> anyhow::Result<Script> {
@@ -94,6 +94,7 @@ impl BtcEngine {
   }
 
   pub fn generate_deposit_address() -> (<Secp256k1Engine as CryptEngine>::PrivateKey, String, [u8; 20]) {
+    //println!("btc/engine.rs generate_deposit_address()");
     let key = Secp256k1Engine::new_private_key();
     let public_key = &bitcoin::util::key::PublicKey {
       compressed: true,
@@ -106,7 +107,6 @@ impl BtcEngine {
     };
     let mut hash_engine = WPubkeyHash::engine();
     public_key.write_into(&mut hash_engine);
-
     (
       key,
       Address::p2wpkh(public_key, NETWORK).to_string(),
@@ -125,13 +125,25 @@ impl BtcEngine {
     other: &[u8],
     other_refund: &[u8]
   ) -> Vec<u8> {
+    //println!("create_lock_script()");
     let b = Secp256k1Engine::public_key_to_bytes(&Secp256k1Engine::to_public_key(&self.b));
     let br = Secp256k1Engine::public_key_to_bytes(&Secp256k1Engine::to_public_key(&self.br));
     let mut bs = vec![other, &b, other_refund, &br];
     if !is_host {
+      //println!("  swop bs fields");
       bs.swap(0, 1);
       bs.swap(2, 3);
     }
+    
+    
+    let str_hex_swap_hash = hex::encode(swap_hash);
+    
+    let swap_hash_crc  = State::<ARC>::calculate( &swap_hash[..]);   
+    let b_crc  = State::<ARC>::calculate( &b[..]);   
+    let br_crc = State::<ARC>::calculate( &br[..]);    
+    let other_crc = State::<ARC>::calculate( &other);
+    let other_refund_crc = State::<ARC>::calculate( &other_refund);
+    //println!("  swap_hash: {} crc={:02x}\n  b: crc={:02x?}\n  br: crc={:02x?}\n  other: crc={:02x?}\n  other_refund: crc={:02x?}",str_hex_swap_hash,swap_hash_crc,b_crc,br_crc,other_crc,other_refund_crc);
 
     let mut lock_script = hex!("63a820").to_vec();
     lock_script.extend(swap_hash.to_vec());
@@ -142,11 +154,17 @@ impl BtcEngine {
     lock_script.extend(bs[1]);
 
     lock_script.extend(&hex!("52ae67"));
+    
+    let mut lock_script_crc  = State::<ARC>::calculate( &lock_script[..]);   
+    //println!("  lock_script_crc 1: crc={:02x}",lock_script_crc);
     match T0 {
       0 => lock_script.push(0),
       1 ..= 16 => lock_script.push(80 + T0),
       _ => lock_script.extend(&[1, T0])
     };
+    lock_script_crc  = State::<ARC>::calculate( &lock_script[..]);   
+    //println!("  lock_script_crc 2: crc={:02x}",lock_script_crc);
+    
     lock_script.extend(&hex!("b2755221"));
     lock_script.extend(bs[2]);
     lock_script.extend(&hex!("21"));
@@ -155,9 +173,22 @@ impl BtcEngine {
 
     self.lock_script_bytes = Some(lock_script.clone());
     self.lock_script = Some(Script::from(lock_script.clone()));
+    
+    let crc = State::<ARC>::calculate( &lock_script[..]);
+    //println!("create_lock_script() crc={:02x?}",crc);
+    
     lock_script
   }
-
+  /*
+  pub fn set_lock_script_bytes(&self, str_hex_lock_script)
+  {
+  
+  }
+  pub fn set_lock_script(&self, str_hex_lock_script)
+  {
+  
+  }
+  */
   /*
     Initially, we just called this function when we needed it
     Then, we called it at the start and then kept a copy in the host/verifier
@@ -184,8 +215,16 @@ impl BtcEngine {
     value: u64,
     fee_per_byte: u64
   ) -> anyhow::Result<(Script, Transaction, secp256k1::Message, Vec<u8>)> {
+    //println!("engine.rs prepare_and_sign_refund()");
+    
+    
     #[allow(non_snake_case)]
     let BR = Secp256k1Engine::public_key_to_bytes(&Secp256k1Engine::to_public_key(&self.br));
+    
+    let br_crc = State::<ARC>::calculate( &BR.clone()[..]);
+    //println!("  br_crc {:02x?}",br_crc);
+    
+    
     let mut refund_keys: Vec<&[u8]> = vec![&BR, other_refund];
     if is_host {
       refund_keys.swap(0, 1);
@@ -240,7 +279,18 @@ impl BtcEngine {
         value
       )
     )?;
-
+    
+    let ca_vec = self.refund_script_bytes.clone().unwrap();
+    let ca_bytes:&[u8] = &ca_vec;
+    let refund_script_bytes_crc = State::<ARC>::calculate( &ca_bytes[..]); 
+    //println!("  refund_script_bytes_crc {:02x?}",refund_script_bytes_crc);
+    
+    let ca_vec = self.lock_script_bytes.clone().unwrap();
+    let ca_bytes:&[u8] = &ca_vec;
+    let lock_script_bytes_crc = State::<ARC>::calculate( &ca_bytes[..]); 
+    //println!("  lock_script_bytes_crc {:02x?}",lock_script_bytes_crc);
+    
+    
     Ok(
       (
         refund_script,

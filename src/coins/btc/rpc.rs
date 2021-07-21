@@ -91,7 +91,14 @@ impl BtcRpc {
   }
 
   pub async fn get_spendable(&self, address: &str) -> anyhow::Result<Vec<UnspentInputResponse>> {
-    self.rpc_call("getaddressunspent", &[address]).await
+    //println!("getaddressunspent {}", address);
+    self.rpc_call("getaddressunspent", &[address]).await    
+  }
+  
+  pub fn get_empty_input_response(&self) -> anyhow::Result<UnspentInputResponse> {
+    let empty_result = UnspentInputResponse { height: 0, tx_hash: "".to_string(), tx_pos: 0, value: 0 };
+    
+    Ok( empty_result )
   }
 
   pub async fn get_fee_per_byte(&self) -> anyhow::Result<u64> {
@@ -139,6 +146,9 @@ impl BtcRpc {
 
   pub async fn publish(&self, tx: &[u8]) -> anyhow::Result<String> {
     self.rpc_call("broadcast", &[hex::encode(tx)]).await
+    //println!("RPC: broadcast {}",hex::encode(tx));
+    //let sStr : String = "Success".to_string();
+    //Ok(sStr)
   }
 
   #[cfg(test)]

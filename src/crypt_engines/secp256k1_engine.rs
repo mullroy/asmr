@@ -5,14 +5,14 @@ use hex_literal::hex;
 
 use log::{debug, trace};
 
-use rand::rngs::OsRng;
 use digest::Digest;
 use sha2::Sha256;
 
 use secp256kfun::{marker::*, Scalar, Point, G, g, s};
 
 use serde::{Serialize, Deserialize};
-
+use crc16::*;
+use rand::{rngs::OsRng};
 use crate::{
   crypt_engines::{Commitment, CryptEngine},
   dl_eq::SHARED_KEY_BITS
@@ -34,8 +34,17 @@ pub struct SecpDleqProof {
 
 impl SecpDleqProof {
   #[allow(non_snake_case)]
-  pub fn new(key: &Scalar, other_base: &Point) -> Self {
-    let r = Scalar::random(&mut OsRng);
+  pub fn new(key: &Scalar, 
+            other_base: &Point, 
+            ca_r:[u8;32]            //Must already be initialised with random data / swap. Generate with: r = Scalar::random(&mut OsRng);
+            ) -> Self {
+    //println!("SecpDleqProof new()");
+    
+    let r = Scalar::from_bytes(ca_r)
+          .expect("will never overflow since ed25519 order is lower")
+          .mark::<NonZero>()
+          .expect("must not be zero");  
+    
     let R1 = g!(r * G);
     let R2 = g!(r * other_base);
     let c: [u8; 32] = Sha256::new()
@@ -55,6 +64,7 @@ impl SecpDleqProof {
 
   #[allow(non_snake_case)]
   pub fn verify(&self, key1: &Point, other_base: &Point, key2: &Point) -> anyhow::Result<()> {
+    //println!("SecpDleqProof verify()");
     let SecpDleqProof { s, c } = self;
     let R1 = g!(s * G - c * key1);
     let R1 = R1.mark::<Normal>().mark::<NonZero>()
@@ -92,13 +102,19 @@ pub struct SecpEncryptedSignature {
   dleq_proof: SecpDleqProof,
 }
 
-pub struct Secp256k1Engine;
+pub struct Secp256k1Engine
+{
+  pub ca_encrypted_sign_r1 : [u8;32],
+  pub ca_encrypted_sign_r2 : [u8;32]
+}
+
+
 impl CryptEngine for Secp256k1Engine {
   type PrivateKey = Scalar;
   type PublicKey = Point;
   type Signature = SecpSignature;
   type EncryptedSignature = SecpEncryptedSignature;
-
+  
   fn new_private_key() -> Self::PrivateKey {
     Scalar::random(&mut OsRng)
   }
@@ -267,13 +283,15 @@ impl CryptEngine for Secp256k1Engine {
       Err(anyhow::anyhow!("Bad signature"))
     }
   }
-
+  
   #[allow(non_snake_case)]
-  fn encrypted_sign(
+  fn encrypted_sign(&mut self,
     signing_key: &Self::PrivateKey,
     encryption_key: &Self::PublicKey,
     message: &[u8]
   ) -> anyhow::Result<Self::EncryptedSignature> {
+    //println!("secp256k1_engine.rs encrypted_sign()");
+    
     if message.len() != 32 {
       anyhow::bail!("Expected message for encrypted_sign to be 32 byte hash");
     }
@@ -281,21 +299,44 @@ impl CryptEngine for Secp256k1Engine {
     message_bytes.copy_from_slice(message);
     let message = Scalar::from_bytes_mod_order(message_bytes)
       .mark::<NonZero>().ok_or_else(|| anyhow::anyhow!("Cannot sign zero message"))?;
-    let r = Scalar::random(&mut OsRng);
+     
+    let signing_crc    = State::<ARC>::calculate( &signing_key.clone().to_bytes()    );
+    let encryption_crc = State::<ARC>::calculate( &encryption_key.clone().to_bytes() );
+    let message_crc    = State::<ARC>::calculate( &message_bytes[..]                 );
+    //println!("  signing_crc={:02x?}\n  encryption_crc={:02x?}\n  message_crc={:02x?}",signing_crc, encryption_crc, message_crc);
+                    
+    let r = Scalar::from_bytes( self.ca_encrypted_sign_r1 )
+            .expect("will never overflow since ed25519 order is lower")
+            .mark::<NonZero>()
+            .expect("must not be zero");
+    
+    let r_crc = State::<ARC>::calculate( &r.to_bytes()[..] );
+    //println!("  r crc={:02x?} {:02x?}", r_crc, r.to_bytes());
+    
     let R = g!(r * encryption_key).mark::<Normal>();
+    //let r_crc = State::<ARC>::calculate( &R.to_bytes()[..] );
+    
     let R_offset = g!(r * G);
-    let dleq_proof = SecpDleqProof::new(&r, &encryption_key);
+    
+    let dleq_proof = SecpDleqProof::new(&r, &encryption_key, self.ca_encrypted_sign_r2 );
+    
     let R_x = Scalar::from_bytes_mod_order(R.coordinates().0);
     let r_inverse = r.invert();
     let s_offset = s!(r_inverse * (message + R_x * signing_key));
     let s_offset = s_offset.mark::<Public>().mark::<NonZero>()
       .ok_or_else(|| anyhow::anyhow!("Generated zero s value"))?;
+      
+      
     let sig = SecpEncryptedSignature {
       R,
       R_offset: R_offset.mark::<Normal>(),
       s_offset,
       dleq_proof,
     };
+    
+    let sig_crc = State::<ARC>::calculate( &Secp256k1Engine::encrypted_signature_to_bytes(&sig)[..] );
+    //println!("  sig_crc={:02x?}", sig_crc);
+    
     trace!(
       "Generated ed25519 encrypted signature for signing key {}, encryption key {}, and message {}: {}",
       hex::encode(g!(signing_key * G).mark::<Normal>().to_bytes()),
@@ -305,6 +346,7 @@ impl CryptEngine for Secp256k1Engine {
     );
     Ok(sig)
   }
+  
   #[allow(non_snake_case)]
   fn encrypted_verify(
     signing_key: &Self::PublicKey,

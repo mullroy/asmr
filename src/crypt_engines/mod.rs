@@ -61,10 +61,11 @@ pub trait CryptEngine: Sized {
   fn sign(secret_key: &Self::PrivateKey, message: &[u8]) -> anyhow::Result<Self::Signature>;
   fn verify_signature(public_key: &Self::PublicKey, message: &[u8], signature: &Self::Signature) -> anyhow::Result<()>;
 
-  fn encrypted_sign(
+   
+  fn encrypted_sign(&mut self,
     signing_key: &Self::PrivateKey,
     encryption_key: &Self::PublicKey,
-    message: &[u8]
+    message: &[u8] 
   ) -> anyhow::Result<Self::EncryptedSignature>;
   fn encrypted_verify(
     signing_key: &Self::PublicKey,

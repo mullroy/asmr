@@ -39,8 +39,8 @@ pub struct Signature {
 pub struct Ed25519Engine<D: Digest<OutputSize = U64>> {
   _phantom: PhantomData<D>,
 }
-pub type Ed25519Sha = Ed25519Engine<sha2::Sha512>;
-pub type Ed25519Blake2b = Ed25519Engine<blake2::Blake2b>;
+//pub type Ed25519Sha = Ed25519Engine<sha2::Sha512>;
+//pub type Ed25519Blake2b = Ed25519Engine<blake2::Blake2b>;
 
 impl<D: Digest<OutputSize = U64>> CryptEngine for Ed25519Engine<D> {
   type PrivateKey = Scalar;
@@ -195,8 +195,8 @@ impl<D: Digest<OutputSize = U64>> CryptEngine for Ed25519Engine<D> {
       Err(anyhow::anyhow!("Bad signature"))
     }
   }
-
-  fn encrypted_sign(
+  
+  fn encrypted_sign(&mut self,
     signing_key: &Self::PrivateKey,
     encryption_key: &Self::PublicKey,
     message: &[u8]

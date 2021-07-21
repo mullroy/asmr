@@ -132,7 +132,7 @@ impl ArrrEngine {
       ),
 
       ask: None,
-      nsk: JubjubEngine::new_private_key(),
+      nsk: JubjubEngine::new_private_key(),                         //<<Changes at every startup
       vk: None,
       diversifier: [0; 11],
 
@@ -143,8 +143,9 @@ impl ArrrEngine {
       note: None,
       branch: None
     };
-    result.height_at_start = result.get_height().await;
-
+    result.height_at_start = result.get_height().await;          //FIXIT - Store height in session.
+    //result.height_at_start = 1480132;
+    
     #[allow(non_snake_case)]
     #[derive(Deserialize, Debug)]
     struct CommitmentResponse {
@@ -158,8 +159,10 @@ impl ArrrEngine {
     struct TreeResponse {
       sapling: SaplingResponse
     }
-    let tree: TreeResponse = result.rpc_call("z_gettreestate", &json![[result.height_at_start.to_string()]]).await?;
+    let tree: TreeResponse = result.rpc_call("z_gettreestate", &json![[result.height_at_start.to_string()]]).await?;  //FIXIT: Get tree state at startup block height
     result.tree = CommitmentTree::<Node>::read(&*hex::decode(tree.sapling.commitments.finalState).expect("pirated returned a non-hex tree"))?;
+    
+    //println!("  block height at start: {}\n tree.root = {:02x?}",result.height_at_start, result.tree.root());
 
     Ok(result)
   }
@@ -209,6 +212,7 @@ impl ArrrEngine {
     ak: &<JubjubEngine as CryptEngine>::PublicKey,
     nsk: &<JubjubEngine as CryptEngine>::PrivateKey
   ) {
+    //println!("arr/engine.rs set_ak_nsk()");
     self.nsk = JubjubEngine::add_private_key(&self.nsk, nsk);
     self.vk = Some(ViewingKey {
       ak: JubjubEngine::add_public_key(&JubjubEngine::to_public_key(
@@ -217,6 +221,35 @@ impl ArrrEngine {
       ),
       nk: JubjubEngine::mul_by_proof_generation_generator(&self.nsk)
     });
+  }
+  
+  //Restore the blockchain height from the session
+  pub async fn set_height_at_start(&mut self, height : isize) -> anyhow::Result<u8>
+  {
+    #[allow(non_snake_case)]
+    #[derive(Deserialize, Debug)]
+    struct CommitmentResponse {
+      finalState: String
+    }
+    #[derive(Deserialize, Debug)]
+    struct SaplingResponse {
+      commitments: CommitmentResponse
+    }
+    #[derive(Deserialize, Debug)]
+    struct TreeResponse {
+      sapling: SaplingResponse
+    }
+
+    self.height_at_start = height;
+    let tree: TreeResponse = self.rpc_call("z_gettreestate", &json![[height.to_string()]]).await?;
+    self.tree = CommitmentTree::<Node>::read(&*hex::decode(tree.sapling.commitments.finalState).expect("pirated returned a non-hex tree"))?;
+    
+    Ok(0)
+  }
+  
+  pub fn get_height_at_start(&mut self) -> isize {
+    //Return blockchain height obtained at startup:
+    self.height_at_start
   }
 
   pub fn get_deposit_address(&mut self) -> String {
@@ -280,6 +313,8 @@ impl ArrrEngine {
   }
 
   async fn get_confirmations(&self, tx_hash_hex: &str) -> anyhow::Result<isize> {
+    //println!("get_confirmations {}", tx_hash_hex);
+    
     #[derive(Deserialize, Debug)]
     struct ConfirmationResponse {
       // in_active_chain: bool,
@@ -295,13 +330,20 @@ impl ArrrEngine {
     Ok(res.rawconfirmations)
   }
 
-  pub async fn get_deposit(&mut self, vk: &ViewingKey, wait: bool) -> anyhow::Result<Option<u64>> {
+  pub async fn get_deposit(&mut self, vk: &ViewingKey, wait: bool) -> anyhow::Result<u64> {
+    //println!("arrr/engine.rs get_deposit()");
+    
+    let tree_backup = self.tree.clone();
     let mut block = self.height_at_start + 1;
+    let mut current_height = self.get_height().await;
+    let total = current_height - block;
+    //println!("Blocks to scan: {}, block height at start: {}, current height: {}",total, block, current_height);
+    //self.tree.root = {:02x?}" self.tree.root() );
     // let mut block_hash = "".to_string();
     let mut tx_hash = "".to_string();
     let mut funds;
     'outer: loop {
-      while self.get_height().await > block {
+      while current_height > block {
         let txs = self.get_block_transactions(block).await?;
         for tx in txs.0 {
           let data = &*tx;
@@ -331,6 +373,7 @@ impl ArrrEngine {
                 // The TXID is stored in little endian, forcing this
                 tx_hash = hex::encode(&tx.txid().0.to_vec().into_iter().rev().map(|x| x.to_owned()).collect::<Vec<u8>>());
                 // block_hash = txs.1.clone();
+                //println!("Found funds at tx_id:{}", tx.txid() );
               }
             }
           }
@@ -355,21 +398,44 @@ impl ArrrEngine {
         }
 
         block += 1;
+        current_height = self.get_height().await;
       }
       if !wait {
-        return Ok(None);
+        //println!("Funds not detected");
+        self.tree = tree_backup;
+        
+        return Ok( 0 ); //Cannot .unwrap a None. Result will crash in verifier.rs
+      }
+      tokio::time::delay_for(std::time::Duration::from_secs(5)).await;
+    }
+  
+    //println!("Detected incoming transaction.{:02x?} Waiting for {} confirmations",tx_hash, CONFIRMATIONS);
+    loop {
+      let i_confirmations = self.get_confirmations(&tx_hash).await?;
+      //println!("Detected confirmations:{}",i_confirmations);
+      
+      if i_confirmations >= CONFIRMATIONS
+      {
+        println!("Funds detected. {} confirmations",i_confirmations);
+        break;
+      }
+      else
+      {
+        println!("Funds detected. {} / {} confirmations detected",i_confirmations, CONFIRMATIONS);
+      }
+    
+      if !wait {
+        //println!("return - nowait. Retore tree");
+        self.tree = tree_backup;
+        
+        return Ok( 0 ); //Cannot .unwrap a None. Result will crash in verifier.rs
       }
       tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
     }
 
-    while self.get_confirmations(&tx_hash).await? < CONFIRMATIONS {
-      if !wait {
-        return Ok(None);
-      }
-      tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
-    }
-
-    return Ok(Some(self.note.as_ref().unwrap().value));
+    //println!("Found funds: {}", self.note.as_ref().unwrap().value);
+    
+    return Ok( self.note.as_ref().unwrap().value );
   }
 
   pub async fn claim(
