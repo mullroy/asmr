@@ -56,15 +56,17 @@ Current limitations and future considerations
      The host again provides the result to its internal library. In
      this way the C++ wrapper only acts as a 'post box' to exchange
      communication between the host&client libraries.
-     Another important function of the library is to save necessary
-     state information. In the event that the swap is disrupted and
-     restarted, the host&client can resynchronise and carry on with
-     the swap. This session data is stored on disk in files called
-     host_session and client_session.
-     This data is currently managed by the library itself and not
-     by the C++ wrapper. In order to make the library completely
-     implementation independent, the session data will have to be
-     maintained and managed by the C++ (or future) applications.
+     The library directly accesses the config files to obtain the
+     wallet RPC parameters and the destination & refund addresses.
+     The library saves necessary state information directly to the
+     state files (host_session & client_session). In the event that
+     the swap is disrupted and restarted, the host&client can 
+     resynchronise and carry on with the swap. 
+     The config & session data is currently managed by the library
+     itself and not by the C++ wrapper. In order to make the library
+     completely implementation independent, the session & config data
+     will have to be maintained externally by the C++ (or future) 
+     applications.
   4) Once a swap is finalised, the session files need to be removed
      manually: host_session and client_session. If these files are
      erased prematurely the state information is lost and by defenition
